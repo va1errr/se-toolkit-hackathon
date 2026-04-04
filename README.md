@@ -25,9 +25,13 @@ LabAssist is an AI-powered Q&A forum built for students taking lab-based courses
 - **Markdown rendering** — AI answers render with proper formatting (code blocks, lists, headers, tables)
 - **Rating system** — 👍/👎 counts displayed, vote persists across page reloads, can change vote
 - **Analyzing status** — pulsing orange badge while AI works
-- **Confidence scores** — every AI answer includes a self-assessed confidence level; < 50% shows "⚠️ TA review recommended"
+- **Confidence scores** — every AI answer includes a self-assessed confidence level; < 50% shows "⚠️"
 - **JWT authentication** — per-user accounts with student/TA/admin roles
-- **Dockerized** — one command to spin up the full stack locally
+- **TA review queue** — flagged AI answers (👎 or low confidence) shown to TAs for manual override
+- **Semantic search** — suggests similar questions before posting to reduce duplicates
+- **Stats dashboard** — forum analytics: question counts, AI performance, rating quality, top users
+- **Hide questions** — admins can soft-hide flagged questions from the TA queue
+- **Dockerized** — one command to spin up the full stack locally with health checks
 - **GitHub lab ingestion** — `python -m seed.ingest_github <repo>` to add labs from any GitHub repo
 
 ---

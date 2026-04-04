@@ -4,7 +4,7 @@ services:
     container_name: labassist-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-labassist}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -15,6 +15,8 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - backend-net
 
   backend:
     build:
@@ -30,12 +32,14 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 15s
-      timeout: 5s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
       retries: 3
       start_period: 60s
     restart: unless-stopped
+    networks:
+      - backend-net
 
   frontend:
     build:
@@ -47,15 +51,18 @@ services:
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 15s
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - frontend-net
+      - backend-net
 
   caddy:
-    image: caddy:2
+    image: caddy:2-alpine
     container_name: labassist-caddy
     ports:
       - "80:80"
@@ -68,14 +75,22 @@ services:
       - frontend
       - backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 15s
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    networks:
+      - frontend-net
 
 volumes:
   postgres_data:
   model_cache:
   caddy_data:
   caddy_config:
+
+networks:
+  backend-net:
+    driver: bridge
+  frontend-net:
+    driver: bridge

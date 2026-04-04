@@ -3,15 +3,13 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
-
-COPY . .
 
 # ---- Production stage ----
 FROM python:3.12-slim
@@ -22,15 +20,18 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Copy application code
-COPY --from=builder /app .
+COPY . .
 
-# Create cache directory for sentence-transformers model
-RUN mkdir -p /root/.cache/huggingface
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser && \
+    mkdir -p /root/.cache/huggingface && \
+    chown -R appuser:appuser /app /root/.cache
 
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
+USER appuser
+
+# Install curl for healthcheck (as root first, then switch back)
+# Already installed via slim image basics
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
