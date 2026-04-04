@@ -125,7 +125,7 @@ docker compose up -d
 This starts:
 - **PostgreSQL** (with pgvector) on port `5433` (internal 5432)
 - **Backend** (FastAPI) on port `8000`
-- **Frontend** (React + Vite) on port `3000`
+- **Frontend** (React + Vite) on port `3000` (mapped from container's 5173)
 
 ### 4. Seed the database
 
@@ -144,7 +144,7 @@ docker compose exec backend python -m seed.ingest_github https://github.com/user
 
 ### 6. Open the app
 
-Visit [http://localhost:3000](http://localhost:3000) and start asking questions.
+Visit [http://localhost:3000](http://localhost:3000) (Docker) or [http://localhost:5173](http://localhost:5173) (local dev) and start asking questions.
 
 ---
 

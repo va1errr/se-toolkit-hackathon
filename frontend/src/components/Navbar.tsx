@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isTA, logout } = useAuth();
 
   return (
     <nav className="navbar">
@@ -14,6 +14,11 @@ export default function Navbar() {
       <div className="nav-links">
         {isAuthenticated ? (
           <>
+            {isTA && (
+              <Link to="/ta/queue" className="nav-ta-queue">
+                🔍 TA Queue
+              </Link>
+            )}
             <span className="nav-user">
               {user?.username} ({user?.role})
             </span>

@@ -23,7 +23,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.config import settings
-from app.api import auth, questions, answers
+from app.api import auth, questions, answers, ta_review
 from app.middleware import RequestLoggingMiddleware
 from app.services.logging import setup_logging
 
@@ -108,3 +108,4 @@ async def health_check(request: Request):
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(questions.router, prefix="/api/v1")
 app.include_router(answers.router, prefix="/api/v1")
+app.include_router(ta_review.router, prefix="/api/v1")

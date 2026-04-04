@@ -8,6 +8,7 @@ import RegisterPage from "./pages/Register";
 import QuestionsListPage from "./pages/QuestionsList";
 import QuestionDetailPage from "./pages/QuestionDetail";
 import AskQuestionPage from "./pages/AskQuestion";
+import TAQueuePage from "./pages/TAQueue";
 import "./styles/global.css";
 
 /** Protects routes that require authentication. Redirects to /login if not authenticated. */
@@ -27,6 +28,9 @@ function AppRoutes() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/questions/new" element={
             <ProtectedRoute><AskQuestionPage /></ProtectedRoute>
+          } />
+          <Route path="/ta/queue" element={
+            <ProtectedRoute><TAQueuePage /></ProtectedRoute>
           } />
           <Route path="/questions/:id" element={<QuestionDetailPage />} />
         </Routes>
