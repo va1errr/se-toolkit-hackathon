@@ -42,7 +42,10 @@ class Question(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: User = Relationship(back_populates="questions")
-    answers: List["Answer"] = Relationship(back_populates="question")
+    answers: List["Answer"] = Relationship(
+        back_populates="question",
+        sa_relationship_kwargs={"foreign_keys": "Answer.question_id"},
+    )
 
 
 class Answer(SQLModel, table=True):
@@ -58,9 +61,15 @@ class Answer(SQLModel, table=True):
     confidence: Optional[float] = Field(default=None, ge=0, le=1)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    question: Question = Relationship(back_populates="answers")
+    question: Question = Relationship(
+        back_populates="answers",
+        sa_relationship_kwargs={"foreign_keys": "Answer.question_id"},
+    )
     user: Optional[User] = Relationship(back_populates="answers")
-    ratings: List["Rating"] = Relationship(back_populates="answer")
+    ratings: List["Rating"] = Relationship(
+        back_populates="answer",
+        sa_relationship_kwargs={"foreign_keys": "Rating.answer_id"},
+    )
 
 
 class Rating(SQLModel, table=True):
@@ -74,7 +83,10 @@ class Rating(SQLModel, table=True):
     helpful: bool
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    answer: Answer = Relationship(back_populates="ratings")
+    answer: Answer = Relationship(
+        back_populates="ratings",
+        sa_relationship_kwargs={"foreign_keys": "Rating.answer_id"},
+    )
     user: User = Relationship(back_populates="ratings")
 
 
