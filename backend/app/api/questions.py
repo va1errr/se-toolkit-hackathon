@@ -2,6 +2,7 @@
 
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
@@ -15,6 +16,9 @@ from app.models.schemas import (
     QuestionResponse,
 )
 from app.services.dependencies import get_current_user
+from app.services.rag import run_rag_pipeline
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -29,7 +33,8 @@ async def create_question(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Create a new question. Triggers an AI answer (RAG pipeline)."""
+    """Create a new question. Triggers an AI answer via the RAG pipeline."""
+    # 1. Create the question
     question = Question(
         user_id=current_user.id,
         title=data.title,
@@ -39,8 +44,39 @@ async def create_question(
     await session.flush()
     await session.refresh(question)
 
-    # TODO (Step 9): Trigger RAG pipeline to generate AI answer
-    # For now, the question is created without an AI answer
+    # 2. Run RAG pipeline to generate AI answer
+    try:
+        answer_text, confidence, lab_numbers = await run_rag_pipeline(
+            question_title=data.title,
+            question_body=data.body,
+            session=session,
+        )
+
+        # 3. Create the AI answer
+        ai_answer = Answer(
+            question_id=question.id,
+            body=answer_text,
+            source="ai",
+            confidence=confidence,
+        )
+        session.add(ai_answer)
+        await session.flush()
+
+        # 4. Link the AI answer to the question
+        question.ai_answer_id = ai_answer.id
+        question.status = "answered" if confidence > 0.3 else "open"
+        await session.flush()
+
+        logger.info(
+            "AI answer generated",
+            question_id=str(question.id),
+            confidence=confidence,
+            labs=lab_numbers,
+        )
+
+    except Exception as e:
+        logger.error("RAG pipeline failed for question", question_id=str(question.id), error=str(e))
+        # Question stays in "open" status without an AI answer
 
     return question
 
