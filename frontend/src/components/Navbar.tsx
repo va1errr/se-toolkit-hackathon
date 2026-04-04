@@ -19,6 +19,9 @@ export default function Navbar() {
                 🔍 TA Queue
               </Link>
             )}
+            <Link to="/stats" className="nav-stats">
+              📊 Stats
+            </Link>
             <span className="nav-user">
               {user?.username} ({user?.role})
             </span>

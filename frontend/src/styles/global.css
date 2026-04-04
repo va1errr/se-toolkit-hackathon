@@ -1209,3 +1209,178 @@ button[type="submit"]:disabled {
   color: var(--gray-600);
 }
 .btn-hide:hover { background: var(--gray-100); }
+
+/* ---- Stats Page ---- */
+.stats-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+.stats-page h1 { margin-bottom: 1.5rem; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.stat-card {
+  background: var(--white);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.stat-card-wide {
+  grid-column: span 2;
+  text-align: left;
+}
+
+.stat-card h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: var(--gray-800);
+}
+
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  margin-top: 0.3rem;
+}
+
+/* Status bars */
+.status-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-analyzing { background: #f39c12; }
+.status-open { background: #e74c3c; }
+.status-answered { background: #27ae60; }
+
+.status-name {
+  text-transform: capitalize;
+  flex: 1;
+  color: var(--gray-800);
+}
+
+.status-count {
+  font-weight: 600;
+  color: var(--gray-600);
+}
+
+/* AI stats */
+.ai-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.ai-stat { text-align: center; }
+
+.ai-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.ai-stat-value.success { color: var(--success); }
+.ai-stat-value.danger { color: var(--danger); }
+
+.ai-stat-label {
+  font-size: 0.75rem;
+  color: var(--gray-600);
+}
+
+/* Rating quality bar */
+.rating-quality { margin-top: 0.5rem; }
+
+.rating-bar {
+  display: flex;
+  height: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--gray-100);
+}
+
+.rating-bar-fill {
+  transition: width 0.3s;
+}
+.rating-bar-fill.good { background: var(--success); }
+.rating-bar-fill.bad { background: var(--danger); }
+
+.rating-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--gray-600);
+}
+
+/* Top users table */
+.top-users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.top-users-table th,
+.top-users-table td {
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.top-users-table th {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  text-transform: uppercase;
+}
+
+.role-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.role-student { background: #e0f2fe; color: #0369a1; }
+.role-ta { background: #fef3c7; color: #92400e; }
+.role-admin { background: #fce7f3; color: #9d174d; }
+
+.stats-footer {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.btn-back-home {
+  color: var(--primary);
+  text-decoration: none;
+}
+.btn-back-home:hover { text-decoration: underline; }
+
+.nav-stats {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+.nav-stats:hover { color: var(--primary-dark); }
