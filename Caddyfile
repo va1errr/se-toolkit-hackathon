@@ -1,6 +1,18 @@
-# Development Caddyfile
-# In production, replace localhost with your domain
+# Production Caddyfile
+# Replace "yourdomain.com" with your actual domain
 
+yourdomain.com {
+    # Enable automatic HTTPS via Let's Encrypt
+    encode gzip
+
+    # Proxy API requests to backend
+    reverse_proxy /api/* backend:8000
+
+    # Proxy everything else to frontend
+    reverse_proxy frontend:80
+}
+
+# Development fallback
 localhost {
     reverse_proxy /api/* backend:8000
     reverse_proxy /* frontend:5173
