@@ -1,6 +1,6 @@
 /** Question detail page with answers and TA reply form. */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Question, Answer } from "../types";
 import AnswerCard from "../components/AnswerCard";

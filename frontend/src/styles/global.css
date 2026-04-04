@@ -628,3 +628,116 @@ button[type="submit"]:disabled {
   color: var(--gray-600);
   padding: 2rem;
 }
+
+/* ---- TA Queue ---- */
+.ta-queue-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+.ta-queue-page h1 { margin-bottom: 0.5rem; }
+
+.flagged-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.flagged-card {
+  background: var(--white);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--danger);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.question-link { text-decoration: none; color: inherit; }
+.question-link:hover h3 { color: var(--primary); }
+
+.rating-badges { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+.badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.badge.thumbs-down { background: #fef2f2; color: var(--danger); }
+.badge.thumbs-up { background: #f0fdf4; color: var(--success); }
+.badge.confidence { background: var(--gray-100); color: var(--gray-600); }
+
+.card-body h4 {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  margin: 1rem 0 0.3rem;
+}
+.card-body h4:first-child { margin-top: 0; }
+
+.question-text {
+  background: var(--gray-100);
+  padding: 0.8rem;
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+}
+
+.ai-answer {
+  background: #f0f9ff;
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid #bae6fd;
+}
+.ai-answer p { margin: 0.5rem 0; }
+.ai-answer code {
+  background: #e2e8f0;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+
+.btn-reply {
+  background: var(--primary);
+  color: var(--white);
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+.btn-reply:hover { background: var(--primary-dark); }
+
+.nav-ta-queue {
+  color: #d97706;
+  text-decoration: none;
+  font-weight: 600;
+}
+.nav-ta-queue:hover { color: #b45309; }
+
+.ta-answer-form { margin-top: 1rem; }
+.ta-answer-form h4 { margin-bottom: 0.5rem; }
+.ta-answer-form textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-family: inherit;
+  margin: 0.5rem 0;
+}
+.ta-answer-form .form-actions { display: flex; gap: 0.5rem; }
+.ta-answer-form .btn-cancel {
+  background: none;
+  border: 1px solid var(--gray-200);
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+}

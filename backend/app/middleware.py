@@ -20,9 +20,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         start_time = time.monotonic()
+        response: Response | None = None
+        status_code = 500  # Default if something fails before response
 
         try:
             response = await call_next(request)
+            status_code = response.status_code
         except Exception:
             # Let the global exception handler deal with it
             raise
@@ -35,8 +38,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     "http_request",
                     method=request.method,
                     path=request.url.path,
-                    status_code=response.status_code,
+                    status_code=status_code,
                     duration_ms=round(duration_ms, 1),
                 )
 
-        return response
+        return response  # type: ignore[return-value]
