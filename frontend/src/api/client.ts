@@ -46,6 +46,20 @@ export const answersApi = {
     api.post(`/answers/${answerId}/rate`, { helpful }),
 };
 
+export const taApi = {
+  flagged: () => api.get("/ta/flagged"),
+  addAnswer: (questionId: string, bodyText: string) =>
+    api.post(`/ta/questions/${questionId}/answer`, { body: bodyText }),
+  editAnswer: (answerId: string, bodyText: string) =>
+    api.put(`/ta/answers/${answerId}`, { body: bodyText }),
+  deleteAnswer: (answerId: string) =>
+    api.delete(`/ta/answers/${answerId}`),
+  hideQuestion: (questionId: string) =>
+    api.put(`/ta/questions/${questionId}/hide`),
+  unhideQuestion: (questionId: string) =>
+    api.put(`/ta/questions/${questionId}/unhide`),
+};
+
 export const healthApi = {
   check: () => api.get<{ status: string }>("/health"),
 };

@@ -1,15 +1,54 @@
-/** Create new question page. */
+/** Create new question page with semantic duplicate detection. */
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { questionsApi } from "../api/client";
+
+interface SimilarQuestion {
+  id: string;
+  title: string;
+  body: string;
+  status: string;
+  similarity: number;
+}
 
 export default function AskQuestionPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [similar, setSimilar] = useState<SimilarQuestion[]>([]);
+  const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  // Search for similar questions as user types
+  useEffect(() => {
+    if (title.length < 5) {
+      setSimilar([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/v1/questions/search?q=${encodeURIComponent(title)}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          // Only show questions with decent similarity
+          setSimilar(data.filter((q: any) => q.similarity > 0.3));
+        }
+      } catch {
+        // Ignore search errors
+      } finally {
+        setSearching(false);
+      }
+    }, 500); // Debounce
+
+    return () => clearTimeout(timer);
+  }, [title]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -49,6 +88,24 @@ export default function AskQuestionPage() {
           />
           <span className="char-count">{title.length}/200</span>
         </div>
+
+        {/* Similar questions suggestions */}
+        {similar.length > 0 && (
+          <div className="similar-questions">
+            <h3>🔍 Similar questions (consider these first):</h3>
+            <ul>
+              {similar.map((q) => (
+                <li key={q.id}>
+                  <Link to={`/questions/${q.id}`}>{q.title}</Link>
+                  <span className="similarity-badge">
+                    {Math.round(q.similarity * 100)}% match
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {searching && <p className="loading">Searching for similar questions...</p>}
 
         <div className="form-group">
           <label>Details</label>

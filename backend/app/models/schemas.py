@@ -80,6 +80,7 @@ class AnswerResponse(BaseModel):
     source: str
     confidence: Optional[float] = None
     created_at: datetime
+    edited: bool = False
     helpful_count: int = 0
     not_helpful_count: int = 0
 

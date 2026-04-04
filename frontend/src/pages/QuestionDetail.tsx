@@ -106,6 +106,8 @@ export default function QuestionDetailPage() {
             key={answer.id}
             answer={answer}
             onRate={loadQuestion}
+            onEdit={loadQuestion}
+            onDelete={loadQuestion}
           />
         ))}
 

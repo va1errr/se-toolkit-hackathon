@@ -18,6 +18,7 @@ from app.models.schemas import (
 )
 from app.services.dependencies import get_current_user, get_required_user
 from app.services.rag import run_rag_pipeline
+from app.services.embeddings import embed_text
 
 logger = structlog.get_logger()
 
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/questions", tags=["questions"])
 
 
 async def _generate_ai_answer(question_id_str: str, title: str, body: str):
-    """Background task to generate AI answer after question is created."""
+    """Background task to generate AI answer and embed question after creation."""
     from sqlalchemy.ext.asyncio import AsyncSession as BGAsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
     from app.config import settings
@@ -36,6 +37,10 @@ async def _generate_ai_answer(question_id_str: str, title: str, body: str):
 
     async with AsyncSessionLocal() as session:
         try:
+            # Embed the question for future semantic search
+            question_embedding = embed_text(f"{title}\n\n{body}")
+
+            # Run RAG pipeline
             answer_text, confidence, lab_numbers = await run_rag_pipeline(
                 question_title=title,
                 question_body=body,
@@ -51,18 +56,14 @@ async def _generate_ai_answer(question_id_str: str, title: str, body: str):
             session.add(ai_answer)
             await session.flush()
 
-            # Update question with AI answer
+            # Update question with embedding and AI answer
             result = await session.execute(
                 select(Question).where(Question.id == question_id_str)
             )
             question = result.scalar_one()
+            question.embedding = question_embedding
             question.ai_answer_id = ai_answer.id
-            if confidence >= 0.5:
-                question.status = "answered"
-            elif confidence >= 0.3:
-                question.status = "open"  # low confidence — TA should review
-            else:
-                question.status = "open"  # unverified — TA should review
+            question.status = "answered" if confidence > 0.3 else "open"
             await session.commit()
 
             logger.info(
@@ -127,6 +128,50 @@ async def list_questions(
 
     result = await session.execute(query)
     return result.scalars().all()
+
+
+@router.get("/search")
+async def search_questions(
+    q: str = Query(..., min_length=3),
+    top_k: int = Query(5, ge=1, le=20),
+    session: AsyncSession = Depends(get_session),
+):
+    """Search for semantically similar questions using pgvector.
+
+    Embeds the query text and finds the most similar existing questions.
+    Used to suggest existing questions before the user posts a duplicate.
+    """
+    query_embedding = embed_text(q)
+    embedding_str = str(query_embedding)
+
+    result = await session.execute(
+        text("""
+            SELECT id, user_id, title, body, status, ai_answer_id,
+                   created_at, updated_at,
+                   1 - (embedding <=> CAST(:emb AS vector)) AS similarity
+            FROM question
+            WHERE embedding IS NOT NULL
+            ORDER BY embedding <=> CAST(:emb AS vector)
+            LIMIT :limit
+        """),
+        {"emb": embedding_str, "limit": top_k},
+    )
+    rows = result.fetchall()
+
+    return [
+        {
+            "id": str(row.id),
+            "user_id": str(row.user_id),
+            "title": row.title,
+            "body": row.body,
+            "status": row.status,
+            "ai_answer_id": str(row.ai_answer_id) if row.ai_answer_id else None,
+            "created_at": row.created_at.isoformat(),
+            "updated_at": row.updated_at.isoformat(),
+            "similarity": float(row.similarity),
+        }
+        for row in rows
+    ]
 
 
 @router.get("/{question_id}", response_model=QuestionDetail)
@@ -209,6 +254,7 @@ async def get_question(
                 "source": a.source,
                 "confidence": a.confidence,
                 "created_at": a.created_at,
+                "edited": a.edited,
                 "helpful_count": ratings_by_answer[str(a.id)]["helpful_count"],
                 "not_helpful_count": ratings_by_answer[str(a.id)]["not_helpful_count"],
                 "user_rating": ratings_by_answer[str(a.id)]["user_rating"],

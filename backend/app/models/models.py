@@ -38,8 +38,13 @@ class Question(SQLModel, table=True):
     user_id: UUID = Field(foreign_key="user.id")
     title: str = Field(max_length=200)
     body: str
-    status: str = Field(default="analyzing")  # analyzing / open / answered / closed
+    status: str = Field(default="analyzing")  # analyzing / open / answered
     ai_answer_id: Optional[UUID] = Field(default=None, foreign_key="answer.id")
+    hidden: bool = Field(default=False)
+    embedding: Optional[List[float]] = Field(
+        default=None,
+        sa_column=Column(Vector(384)),
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -61,6 +66,7 @@ class Answer(SQLModel, table=True):
     body: str
     source: str  # ai / ta / student
     confidence: Optional[float] = Field(default=None, ge=0, le=1)
+    edited: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     question: Question = Relationship(

@@ -226,7 +226,6 @@ labassist/
 | `analyzing` | AI is processing the answer (background task) |
 | `open` | No AI answer yet, or low confidence (< 50%) — needs TA review |
 | `answered` | AI provided answer with confidence ≥ 50% |
-| `closed` | Resolved |
 
 ---
 

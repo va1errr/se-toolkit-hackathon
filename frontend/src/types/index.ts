@@ -12,7 +12,7 @@ export interface Question {
   user_id: string;
   title: string;
   body: string;
-  status: "open" | "answered" | "closed" | "analyzing";
+  status: "analyzing" | "open" | "answered";
   ai_answer_id: string | null;
   created_at: string;
   updated_at: string;
@@ -27,6 +27,7 @@ export interface Answer {
   source: "ai" | "ta" | "student";
   confidence: number | null;
   created_at: string;
+  edited: boolean;
   helpful_count: number;
   not_helpful_count: number;
   user_rating: boolean | null;

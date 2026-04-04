@@ -9,10 +9,9 @@ interface Props {
 
 export default function QuestionCard({ question }: Props) {
   const statusColors: Record<string, string> = {
+    analyzing: "#f39c12",
     open: "#e74c3c",
     answered: "#27ae60",
-    closed: "#95a5a6",
-    analyzing: "#f39c12",
   };
 
   return (

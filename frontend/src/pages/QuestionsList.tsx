@@ -42,7 +42,7 @@ export default function QuestionsListPage() {
       </div>
 
       <div className="filters">
-        {["", "open", "answered", "closed"].map((s) => (
+        {["", "analyzing", "open", "answered"].map((s) => (
           <button
             key={s}
             className={filter === s ? "active" : ""}
