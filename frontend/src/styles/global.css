@@ -243,6 +243,10 @@ button[type="submit"]:disabled {
   animation: pulse 2s infinite;
 }
 
+.status-badge.needs-review {
+  animation: pulse 2s infinite;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -318,6 +322,12 @@ button[type="submit"]:disabled {
   animation: pulse 2s infinite;
 }
 
+.question-meta .status.needs-review {
+  background: #ffedd5;
+  color: #c2410c;
+  animation: pulse 2s infinite;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -352,6 +362,15 @@ button[type="submit"]:disabled {
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   font-size: 0.8rem;
+}
+
+.answer-badge {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .confidence {

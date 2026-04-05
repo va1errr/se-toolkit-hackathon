@@ -79,7 +79,10 @@ export default function QuestionDetailPage() {
         <p className="question-body">{question.body}</p>
         <div className="question-meta">
           <span className={`status ${question.status === "analyzing" ? "analyzing" : ""}`}>
-            {question.status === "analyzing" ? "🤖 AI is analyzing..." : question.status}
+            {question.status === "analyzing" && "🤖 AI is analyzing..."}
+            {question.status === "open" && "🔍 In TA queue"}
+            {question.status === "answered" && (question as any).answer_label}
+            {question.status === "answered" && !(question as any).answer_label && "✅ Answered"}
           </span>
           <span className="date">
             {new Date(question.created_at).toLocaleString()}
@@ -101,15 +104,16 @@ export default function QuestionDetailPage() {
           <p className="empty">No answers yet.</p>
         )}
 
-        {question.answers?.map((answer: Answer) => (
-          <AnswerCard
-            key={answer.id}
-            answer={answer}
-            onRate={loadQuestion}
-            onEdit={loadQuestion}
-            onDelete={loadQuestion}
-          />
-        ))}
+        {question.answers
+          ?.map((answer: Answer) => (
+            <AnswerCard
+              key={answer.id}
+              answer={answer}
+              onRate={loadQuestion}
+              onEdit={loadQuestion}
+              onDelete={loadQuestion}
+            />
+          ))}
 
         {isTA && (
           <form className="ta-answer-form" onSubmit={handleTASubmit}>

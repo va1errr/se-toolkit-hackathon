@@ -55,6 +55,8 @@ class QuestionResponse(BaseModel):
     body: str
     status: str
     ai_answer_id: Optional[UUID] = None
+    ai_reasoning_time_seconds: Optional[float] = None
+    answer_label: Optional[str] = None  # "🤖 AI Answer", "👨‍🏫 TA Answer", or None
     created_at: datetime
     updated_at: datetime
 

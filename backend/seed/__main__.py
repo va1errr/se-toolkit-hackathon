@@ -38,27 +38,17 @@ def seed_db():
 
         print("Seeding database...")
 
-        # --- Create demo users ---
-        demo_users = [
-            User(
-                username="student_demo",
-                password_hash=hash_password("password123"),
-                role="student",
-            ),
-            User(
-                username="ta_demo",
-                password_hash=hash_password("password123"),
-                role="ta",
-            ),
+        # --- Create users ---
+        users = [
             User(
                 username="admin",
                 password_hash=hash_password("admin123"),
                 role="admin",
             ),
         ]
-        session.add_all(demo_users)
+        session.add_all(users)
         session.flush()
-        print(f"  Created {len(demo_users)} users: student_demo, ta_demo, admin")
+        print(f"  Created {len(users)} user: admin")
 
         # --- Create lab documents from markdown files ---
         seed_dir = os.path.dirname(os.path.abspath(__file__))

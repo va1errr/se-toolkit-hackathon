@@ -67,6 +67,8 @@ async def _generate_ai_answer(question_id_str: str, title: str, body: str):
             question = result.scalar_one()
             question.embedding = question_embedding
             question.ai_answer_id = ai_answer.id
+            question.ai_reasoning_time_seconds = reasoning_time
+            # Low confidence → open (goes to TA queue)
             question.status = "answered" if confidence > 0.3 else "open"
             await session.commit()
 
@@ -79,7 +81,15 @@ async def _generate_ai_answer(question_id_str: str, title: str, body: str):
             )
         except Exception as e:
             logger.error("Background RAG failed", question_id=question_id_str, error=str(e))
-            # Leave question as "open" without AI answer
+            # Track reasoning time on the question even when AI fails
+            result = await session.execute(
+                select(Question).where(Question.id == question_id_str)
+            )
+            question = result.scalar_one()
+            question.embedding = embed_text(f"{title}\n\n{body}")
+            question.ai_reasoning_time_seconds = round(time.time() - start_time, 2)
+            question.status = "open"  # Send to TA queue
+            await session.commit()
         finally:
             await engine.dispose()
 
@@ -126,13 +136,52 @@ async def list_questions(
     session: AsyncSession = Depends(get_session),
 ):
     """List questions, optionally filtered by status. Paginated."""
-    query = select(Question).order_by(Question.created_at.desc())
-    if status_filter:
-        query = query.where(Question.status == status_filter)
-    query = query.offset(skip).limit(limit)
+    # Get questions with answer label info in one query
+    sf = status_filter if status_filter else "ALL"
+    result = await session.execute(
+        text("""
+            SELECT
+                q.id, q.user_id, q.title, q.body, q.status, q.ai_answer_id,
+                q.ai_reasoning_time_seconds, q.created_at, q.updated_at,
+                CASE
+                    WHEN q.status = 'answered' AND q.ai_answer_id IS NOT NULL
+                         AND ai_answer.confidence > 0
+                         AND (SELECT COUNT(*) FROM rating r WHERE r.answer_id = ai_answer.id AND r.helpful = false) = 0
+                    THEN '🤖 AI Answer'
+                    WHEN q.status = 'answered'
+                         AND EXISTS (
+                             SELECT 1 FROM answer ta
+                             WHERE ta.question_id = q.id AND ta.source != 'ai'
+                             AND (SELECT COUNT(*) FROM rating r WHERE r.answer_id = ta.id AND r.helpful = true) >= 1
+                         )
+                    THEN '👨‍🏫 TA Answer'
+                    ELSE NULL
+                END as answer_label
+            FROM question q
+            LEFT JOIN answer ai_answer ON ai_answer.id = q.ai_answer_id
+            WHERE q.status = :status_filter OR :status_filter = 'ALL'
+            ORDER BY q.created_at DESC
+            LIMIT :limit OFFSET :skip
+        """),
+        {"status_filter": sf, "limit": limit, "skip": skip},
+    )
+    rows = result.fetchall()
 
-    result = await session.execute(query)
-    return result.scalars().all()
+    return [
+        {
+            "id": str(row.id),
+            "user_id": str(row.user_id),
+            "title": row.title,
+            "body": row.body,
+            "status": row.status,
+            "ai_answer_id": str(row.ai_answer_id) if row.ai_answer_id else None,
+            "ai_reasoning_time_seconds": row.ai_reasoning_time_seconds,
+            "answer_label": row.answer_label,
+            "created_at": row.created_at.isoformat(),
+            "updated_at": row.updated_at.isoformat(),
+        }
+        for row in rows
+    ]
 
 
 @router.get("/search")
@@ -241,6 +290,29 @@ async def get_question(
         }
 
     # Build response dict manually to avoid ORM lazy-loading issues
+    # Compute answer_label
+    answer_label = None
+    if question.status == "answered":
+        # Check for AI answer with no dislikes
+        ai_answer = None
+        for a in answers:
+            if a.id == question.ai_answer_id:
+                ai_answer = a
+                break
+        if ai_answer and ai_answer.confidence and ai_answer.confidence > 0:
+            # Check dislikes for AI answer
+            ai_dislikes = ratings_by_answer.get(str(ai_answer.id), {}).get("not_helpful_count", 0)
+            if ai_dislikes == 0:
+                answer_label = "🤖 AI Answer"
+        # Check for TA answer with ≥1 like
+        if not answer_label:
+            for a in answers:
+                if a.source != "ai":
+                    ta_likes = ratings_by_answer.get(str(a.id), {}).get("helpful_count", 0)
+                    if ta_likes >= 1:
+                        answer_label = "👨‍🏫 TA Answer"
+                        break
+
     return {
         "id": question.id,
         "user_id": question.user_id,
@@ -248,6 +320,8 @@ async def get_question(
         "body": question.body,
         "status": question.status,
         "ai_answer_id": question.ai_answer_id,
+        "ai_reasoning_time_seconds": question.ai_reasoning_time_seconds,
+        "answer_label": answer_label,
         "created_at": question.created_at,
         "updated_at": question.updated_at,
         "answers": [

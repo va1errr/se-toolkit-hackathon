@@ -48,7 +48,10 @@ export default function QuestionsListPage() {
             className={filter === s ? "active" : ""}
             onClick={() => setFilter(s)}
           >
-            {s || "All"}
+            {s === "" && "All"}
+            {s === "analyzing" && "🤖 Analyzing"}
+            {s === "open" && "🔍 Open"}
+            {s === "answered" && "✅ Answered"}
           </button>
         ))}
       </div>

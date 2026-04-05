@@ -31,7 +31,7 @@ async def get_flagged_answers(
     under that question gets at least one 👍.
     Returns questions ordered by most flagged first.
     """
-    # Base query: AI answers with at least one 👎 OR low confidence (open status)
+    # Base query: AI answers with at least one 👎 OR open status
     base_query = text("""
         SELECT
             q.id as question_id,
@@ -125,9 +125,6 @@ async def ta_add_answer(
         source="ta",
     )
     session.add(ta_answer)
-    await session.flush()
-
-    question.status = "answered"
     await session.commit()
     await session.refresh(ta_answer)
 

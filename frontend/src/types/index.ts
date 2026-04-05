@@ -12,8 +12,9 @@ export interface Question {
   user_id: string;
   title: string;
   body: string;
-  status: "analyzing" | "open" | "answered";
+  status: "analyzing" | "open" | "answered" | "needs_review";
   ai_answer_id: string | null;
+  ai_reasoning_time_seconds: number | null;
   created_at: string;
   updated_at: string;
   answers?: Answer[];

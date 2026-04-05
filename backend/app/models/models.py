@@ -38,9 +38,10 @@ class Question(SQLModel, table=True):
     user_id: UUID = Field(foreign_key="user.id")
     title: str = Field(max_length=200)
     body: str
-    status: str = Field(default="analyzing")  # analyzing / open / answered
+    status: str = Field(default="analyzing")  # analyzing / open / answered / needs_review
     ai_answer_id: Optional[UUID] = Field(default=None, foreign_key="answer.id")
     hidden: bool = Field(default=False)
+    ai_reasoning_time_seconds: Optional[float] = Field(default=None)
     embedding: Optional[List[float]] = Field(
         default=None,
         sa_column=Column(Vector(384)),

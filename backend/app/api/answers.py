@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col, select
+from sqlmodel import col, select, text
 
 from app.database import get_session
 from app.models.models import Answer, Rating, Question, User
@@ -67,7 +67,7 @@ async def rate_answer(
     current_user: User = Depends(get_required_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Rate an answer as helpful or not (students only)."""
+    """Rate an answer as helpful or not."""
     # Verify answer exists
     a_result = await session.execute(
         select(Answer).where(Answer.id == answer_id)
@@ -86,19 +86,51 @@ async def rate_answer(
     existing_rating = existing.scalar_one_or_none()
 
     if existing_rating:
-        # User already rated — update their choice instead of rejecting
+        # User already rated — update their choice
         existing_rating.helpful = data.helpful
         await session.flush()
         await session.refresh(existing_rating)
-        return existing_rating
+        rating = existing_rating
+    else:
+        rating = Rating(
+            answer_id=answer_id,
+            user_id=current_user.id,
+            helpful=data.helpful,
+        )
+        session.add(rating)
+        await session.flush()
+        await session.refresh(rating)
 
-    rating = Rating(
-        answer_id=answer_id,
-        user_id=current_user.id,
-        helpful=data.helpful,
-    )
-    session.add(rating)
-    await session.flush()
-    await session.refresh(rating)
+    # If a non-AI answer gets its first 👍, mark question as answered (remove from queue)
+    if data.helpful and answer.source != "ai":
+        like_count = await session.execute(
+            text("SELECT COUNT(*) FROM rating WHERE answer_id = :aid AND helpful = true"),
+            {"aid": str(answer_id)},
+        )
+        if like_count.scalar() >= 1:
+            await session.execute(
+                text("UPDATE question SET status = 'answered' WHERE id = :qid"),
+                {"qid": str(answer.question_id)},
+            )
+            await session.commit()
+
+    # If a non-AI answer lost its last 👍, check if question should go back to open
+    if not data.helpful and answer.source != "ai":
+        # Check if there's still a TA answer with ≥1 like for this question
+        ta_likes_result = await session.execute(
+            text("""
+                SELECT COUNT(*) FROM rating r
+                JOIN answer ta ON ta.id = r.answer_id
+                WHERE ta.question_id = :qid AND ta.source != 'ai' AND r.helpful = true
+            """),
+            {"qid": str(answer.question_id)},
+        )
+        if ta_likes_result.scalar() == 0:
+            # No TA answer has likes anymore — put back in queue
+            await session.execute(
+                text("UPDATE question SET status = 'open' WHERE id = :qid"),
+                {"qid": str(answer.question_id)},
+            )
+            await session.commit()
 
     return rating

@@ -28,18 +28,23 @@ async def get_stats(
     total_result = await session.execute(text("SELECT COUNT(*) FROM question"))
     total_questions = total_result.scalar() or 0
 
-    # AI answer stats
+    # AI answer stats (includes both successful answers and failed attempts tracked on questions)
     ai_result = await session.execute(text("""
+        WITH ai_answers AS (
+            SELECT a.id, a.confidence, a.reasoning_time_seconds, q.ai_reasoning_time_seconds as q_reasoning_time
+            FROM answer a
+            LEFT JOIN question q ON q.ai_answer_id = a.id
+            WHERE a.source = 'ai'
+        )
         SELECT
             COUNT(*) as total_ai,
             AVG(confidence) as avg_confidence,
             COUNT(*) FILTER (WHERE confidence >= 0.5) as high_confidence,
             COUNT(*) FILTER (WHERE confidence < 0.5) as low_confidence,
-            MIN(reasoning_time_seconds) as min_reasoning_time,
-            MAX(reasoning_time_seconds) as max_reasoning_time,
-            AVG(reasoning_time_seconds) as avg_reasoning_time
-        FROM answer
-        WHERE source = 'ai'
+            MIN(COALESCE(reasoning_time_seconds, q_reasoning_time)) as min_reasoning_time,
+            MAX(COALESCE(reasoning_time_seconds, q_reasoning_time)) as max_reasoning_time,
+            AVG(COALESCE(reasoning_time_seconds, q_reasoning_time)) as avg_reasoning_time
+        FROM ai_answers
     """))
     ai_row = ai_result.first()
 
