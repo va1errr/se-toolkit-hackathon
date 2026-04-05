@@ -13,8 +13,15 @@ interface StatsData {
   ai_avg_confidence: number;
   ai_high_confidence: number;
   ai_low_confidence: number;
+  ai_reasoning_time: { min: number | null; max: number | null; avg: number | null };
   ratings: { helpful: number; not_helpful: number };
   top_users: { username: string; role: string; questions: number }[];
+}
+
+function formatReasoningTime(seconds: number | null): string {
+  if (seconds == null) return "—";
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
 }
 
 export default function StatsPage() {
@@ -104,6 +111,18 @@ export default function StatsPage() {
             <div className="ai-stat">
               <div className="ai-stat-value danger">{stats.ai_low_confidence}</div>
               <div className="ai-stat-label">Low Conf. (&lt;50%)</div>
+            </div>
+            <div className="ai-stat">
+              <div className="ai-stat-value">{formatReasoningTime(stats.ai_reasoning_time?.avg ?? null)}</div>
+              <div className="ai-stat-label">Avg Time</div>
+            </div>
+            <div className="ai-stat">
+              <div className="ai-stat-value">{formatReasoningTime(stats.ai_reasoning_time?.min ?? null)}</div>
+              <div className="ai-stat-label">Min Time</div>
+            </div>
+            <div className="ai-stat">
+              <div className="ai-stat-value">{formatReasoningTime(stats.ai_reasoning_time?.max ?? null)}</div>
+              <div className="ai-stat-label">Max Time</div>
             </div>
           </div>
         </div>

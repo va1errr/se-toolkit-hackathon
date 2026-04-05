@@ -1,5 +1,6 @@
 """Questions API endpoints: create, list, and get details."""
 
+import time
 from typing import Optional
 from uuid import UUID
 
@@ -40,18 +41,21 @@ async def _generate_ai_answer(question_id_str: str, title: str, body: str):
             # Embed the question for future semantic search
             question_embedding = embed_text(f"{title}\n\n{body}")
 
-            # Run RAG pipeline
+            # Run RAG pipeline and measure reasoning time
+            start_time = time.time()
             answer_text, confidence, lab_numbers = await run_rag_pipeline(
                 question_title=title,
                 question_body=body,
                 session=session,
             )
+            reasoning_time = round(time.time() - start_time, 2)
 
             ai_answer = Answer(
                 question_id=question_id_str,
                 body=answer_text,
                 source="ai",
                 confidence=confidence,
+                reasoning_time_seconds=reasoning_time,
             )
             session.add(ai_answer)
             await session.flush()
@@ -71,6 +75,7 @@ async def _generate_ai_answer(question_id_str: str, title: str, body: str):
                 question_id=question_id_str,
                 confidence=confidence,
                 labs=lab_numbers,
+                reasoning_time=reasoning_time,
             )
         except Exception as e:
             logger.error("Background RAG failed", question_id=question_id_str, error=str(e))
@@ -258,6 +263,7 @@ async def get_question(
                 "helpful_count": ratings_by_answer[str(a.id)]["helpful_count"],
                 "not_helpful_count": ratings_by_answer[str(a.id)]["not_helpful_count"],
                 "user_rating": ratings_by_answer[str(a.id)]["user_rating"],
+                "reasoning_time_seconds": a.reasoning_time_seconds,
             }
             for a in answers
         ],

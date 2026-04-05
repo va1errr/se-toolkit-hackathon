@@ -83,6 +83,7 @@ class AnswerResponse(BaseModel):
     edited: bool = False
     helpful_count: int = 0
     not_helpful_count: int = 0
+    reasoning_time_seconds: Optional[float] = None
 
     class ConfigDict:  # noqa: N801
         from_attributes = True

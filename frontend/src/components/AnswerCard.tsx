@@ -98,6 +98,13 @@ export default function AnswerCard({ answer, onRate, onEdit, onDelete }: Props) 
             {answer.confidence < 0.5 && " ⚠️"}
           </span>
         )}
+        {answer.source === "ai" && answer.reasoning_time_seconds != null && (
+          <span className="reasoning-time">
+            ⏱️ {answer.reasoning_time_seconds < 60
+              ? `${answer.reasoning_time_seconds.toFixed(1)}s`
+              : `${Math.floor(answer.reasoning_time_seconds / 60)}m ${Math.round(answer.reasoning_time_seconds % 60)}s`}
+          </span>
+        )}
         {answer.edited && <span className="edited-badge">(edited)</span>}
       </div>
 

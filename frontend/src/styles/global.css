@@ -1118,6 +1118,15 @@ button[type="submit"]:disabled {
   font-style: italic;
 }
 
+.reasoning-time {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 .edit-form { margin: 0.5rem 0; }
 .edit-form textarea {
   width: 100%;

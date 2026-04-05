@@ -46,8 +46,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
     container_name: labassist-frontend
-    expose:
-      - "80"
+    ports:
+      - "80:80"
+      - "443:443"
     depends_on:
       - backend
     healthcheck:
@@ -61,33 +62,9 @@ services:
       - frontend-net
       - backend-net
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: labassist-caddy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - frontend
-      - backend
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - frontend-net
-
 volumes:
   postgres_data:
   model_cache:
-  caddy_data:
-  caddy_config:
 
 networks:
   backend-net:

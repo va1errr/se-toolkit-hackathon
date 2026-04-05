@@ -34,7 +34,10 @@ async def get_stats(
             COUNT(*) as total_ai,
             AVG(confidence) as avg_confidence,
             COUNT(*) FILTER (WHERE confidence >= 0.5) as high_confidence,
-            COUNT(*) FILTER (WHERE confidence < 0.5) as low_confidence
+            COUNT(*) FILTER (WHERE confidence < 0.5) as low_confidence,
+            MIN(reasoning_time_seconds) as min_reasoning_time,
+            MAX(reasoning_time_seconds) as max_reasoning_time,
+            AVG(reasoning_time_seconds) as avg_reasoning_time
         FROM answer
         WHERE source = 'ai'
     """))
@@ -85,6 +88,11 @@ async def get_stats(
         "ai_avg_confidence": round(float(ai_row.avg_confidence), 2) if ai_row and ai_row.avg_confidence else 0,
         "ai_high_confidence": ai_row.high_confidence if ai_row else 0,
         "ai_low_confidence": ai_row.low_confidence if ai_row else 0,
+        "ai_reasoning_time": {
+            "min": round(float(ai_row.min_reasoning_time), 2) if ai_row and ai_row.min_reasoning_time else None,
+            "max": round(float(ai_row.max_reasoning_time), 2) if ai_row and ai_row.max_reasoning_time else None,
+            "avg": round(float(ai_row.avg_reasoning_time), 2) if ai_row and ai_row.avg_reasoning_time else None,
+        },
         "ratings": {
             "helpful": rating_row.helpful if rating_row else 0,
             "not_helpful": rating_row.not_helpful if rating_row else 0,

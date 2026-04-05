@@ -31,6 +31,7 @@ export interface Answer {
   helpful_count: number;
   not_helpful_count: number;
   user_rating: boolean | null;
+  reasoning_time_seconds: number | null;
 }
 
 export interface Rating {

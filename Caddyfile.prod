@@ -1,8 +1,7 @@
 # Production Caddyfile
-# Replace yourdomain.com with your actual domain
 
-yourdomain.com {
-    # Enable automatic HTTPS via Let's Encrypt
+:80 {
+    # No TLS for IP access, just plain HTTP
     encode gzip
 
     # Security headers

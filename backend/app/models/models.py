@@ -67,6 +67,7 @@ class Answer(SQLModel, table=True):
     source: str  # ai / ta / student
     confidence: Optional[float] = Field(default=None, ge=0, le=1)
     edited: bool = Field(default=False)
+    reasoning_time_seconds: Optional[float] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     question: Question = Relationship(
