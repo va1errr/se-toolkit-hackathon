@@ -9,10 +9,8 @@ RUN apt-get update && \
 
 COPY requirements.txt .
 
-# Install only non-PyTorch deps first (better caching)
-RUN pip install --no-cache-dir \
-    fastapi uvicorn sqlmodel asyncpg alembic pgvector \
-    pydantic-settings PyJWT bcrypt slowapi structlog python-multipart httpx greenlet
+# Install dependencies from requirements.txt (includes psycopg2-binary)
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Install PyTorch CPU-only (much smaller, ~200MB vs 2GB)
 RUN pip install --no-cache-dir torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu

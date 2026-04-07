@@ -41,9 +41,12 @@ docker compose up -d --build
 
 # Verify it's running
 curl http://localhost:8080/health
+
+# Connect qwen-code-api to LabAssist's Docker network so the backend can reach it
+docker network connect labassist_default qwen-code-api-qwen-code-api-1
 ```
 
-The proxy runs on port 8080. Set `LLM_API_BASE=http://host.docker.internal:8080/v1` in your LabAssist `.env`.
+The proxy runs on port 8080. Set `LLM_API_BASE=http://qwen-code-api-qwen-code-api-1:8080/v1` in your LabAssist `.env` (using the container name, since `host.docker.internal` does not resolve on Linux).
 
 > **Note:** qwen-code-api is a **separate Docker Compose project**. It does NOT start automatically with LabAssist — you must start it yourself first.
 
@@ -104,11 +107,12 @@ cp .env.example .env
 Edit `.env` and set the following:
 
 ```env
-# Database (default works for Docker Compose)
+# Database (use the Docker service name "postgres", not localhost)
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/labassist
 
 # LLM API — point to your Qwen Code API proxy
-LLM_API_BASE=http://host.docker.internal:8080/v1
+# When using qwen-code-api on the same Docker network, use the container name:
+LLM_API_BASE=http://qwen-code-api-qwen-code-api-1:8080/v1
 LLM_API_KEY=your-qwen-api-key
 
 # Security — generate a random key
@@ -122,7 +126,7 @@ APP_ENV=development
 LOG_LEVEL=DEBUG
 ```
 
-> **Note**: On Linux, `host.docker.internal` may not resolve. Use your host machine's IP address instead (e.g., `http://172.17.0.1:8080/v1`). Find it with `ip addr show docker0`.
+> **Note**: If you're running qwen-code-api on the host rather than in a container on the same network, use your host machine's IP address (e.g., `http://172.17.0.1:8080/v1`). Find it with `ip addr show docker0`.
 
 ### Step 3: Start the Stack
 
@@ -148,7 +152,70 @@ curl http://localhost:8000/health
 # http://localhost
 ```
 
-### Step 5: Seed the Database
+### Step 4b: Run Database Migrations
+
+After a fresh database setup, run Alembic migrations to create the tables:
+
+```bash
+docker compose exec backend alembic upgrade head
+```
+
+### Step 5: Ingest Lab Materials from GitHub
+
+LabAssist uses **RAG (Retrieval-Augmented Generation)** to answer questions based on your actual lab materials. You need to ingest your course materials into the database so the AI can reference them.
+
+```bash
+# Ingest a GitHub repository containing lab materials
+docker compose exec backend python -m seed.ingest_github \
+    https://github.com/your-org/lab-materials \
+    --lab-number 1 \
+    --lab-title "Introduction to Lab"
+```
+
+**How it works:**
+1. Clones the repository (shallow clone, fast)
+2. Finds all `.md` files, skipping boilerplate (LICENSE, CHANGELOG, etc.)
+3. Concatenates them into a single lab document
+4. Splits the content into chunks (for better retrieval)
+5. Generates embeddings for each chunk using a local embedding model
+6. Stores everything in the database for semantic search
+
+**Options:**
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `repo_url` | ✅ | GitHub repository URL (must be public or accessible with git credentials) |
+| `--lab-number` | Auto-detected | Lab number. Auto-detected from repo name if omitted (e.g., `lab-3` → 3) |
+| `--lab-title` | Auto-detected | Lab title. Auto-detected from the first `#` heading if omitted |
+
+**Examples:**
+
+```bash
+# Auto-detect lab number and title from repo
+docker compose exec backend python -m seed.ingest_github https://github.com/univ/lab-3
+
+# Specify everything explicitly
+docker compose exec backend python -m seed.ingest_github \
+    https://github.com/univ/cs-labs \
+    --lab-number 5 \
+    --lab-title "Data Structures and Algorithms"
+
+# Ingest multiple labs
+docker compose exec backend python -m seed.ingest_github https://github.com/univ/lab-1 --lab-number 1
+docker compose exec backend python -m seed.ingest_github https://github.com/univ/lab-2 --lab-number 2
+docker compose exec backend python -m seed.ingest_github https://github.com/univ/lab-3 --lab-number 3
+```
+
+**Overwriting existing labs:** If a lab with the same number already exists, the script will prompt you to confirm overwriting. Use this to update lab materials when content changes.
+
+**Requirements:**
+- The repository must be accessible (public, or you have git credentials configured)
+- Markdown files must have at least 50 characters of content to be included
+- First run downloads the embedding model (~80MB), which is cached for future use
+
+### Step 5b: (Optional) Seed Demo Users
+
+If you need demo accounts for testing:
 
 ```bash
 docker compose exec backend python -m seed
@@ -156,14 +223,8 @@ docker compose exec backend python -m seed
 
 This creates:
 - An admin user (`admin` / `admin123`)
-- Lab documents from the `seed/` directory (chunked and embedded)
 
-### Step 6: (Optional) Ingest Additional Lab Materials
-
-```bash
-# From a GitHub repository
-docker compose exec backend python -m seed.ingest_github https://github.com/user/lab-materials --lab-number 4
-```
+> **Note:** The seed script no longer creates lab documents from the `seed/` directory. Use `ingest_github` (Step 5) to load your actual course materials instead.
 
 ---
 
@@ -220,7 +281,18 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 No separate reverse proxy (like Caddy) is needed.
 
-### Step 4: Seed the Database
+### Step 4: Ingest Lab Materials
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python -m seed.ingest_github \
+    https://github.com/your-org/lab-materials \
+    --lab-number 1 \
+    --lab-title "Introduction to Lab"
+```
+
+> See the [Ingest Lab Materials from GitHub](#step-5-ingest-lab-materials-from-github) section above for full details and options.
+
+### Step 5: Seed Demo Users (Optional)
 
 ```bash
 docker compose -f docker-compose.prod.yml exec backend python -m seed
@@ -246,14 +318,16 @@ curl http://localhost/health
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql+asyncpg://postgres:postgres@postgres:5432/labassist` | Async PostgreSQL connection |
-| `LLM_API_BASE` | `http://localhost:8080/v1` | Base URL for the LLM API |
+| `DATABASE_URL` | `postgresql+asyncpg://postgres:postgres@postgres:5432/labassist` | Async PostgreSQL connection (use `postgres` service name in Docker) |
+| `LLM_API_BASE` | `http://qwen-code-api-qwen-code-api-1:8080/v1` | Base URL for the LLM API (when using qwen-code-api on the same Docker network) |
 | `LLM_API_KEY` | *(empty)* | API key for LLM authentication |
 | `SECRET_KEY` | `change-me-to-a-random-string` | JWT signing key — **change in production** |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | JWT token lifetime |
-| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins |
+| `CORS_ORIGINS` | `http://localhost` | Comma-separated allowed origins |
 | `APP_ENV` | `development` | `development` or `production` |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+
+> **Note**: Requires Docker Compose v2 (`docker compose` with a space, not `docker-compose`).
 
 ### Production (`.env.prod`)
 
@@ -332,36 +406,41 @@ docker compose logs backend
 
 # Common causes:
 # 1. Can't connect to database — check postgres is running
-# 2. LLM API unreachable — verify LLM_API_BASE is correct
-# 3. Missing dependencies — rebuild with --no-cache
+# 2. Database tables not created — run: docker compose exec backend alembic upgrade head
+# 3. LLM API unreachable — verify LLM_API_BASE is correct
+#    - When using qwen-code-api, ensure it's on the same Docker network:
+#      docker network connect labassist_default qwen-code-api-qwen-code-api-1
+# 4. Missing dependencies — rebuild with --no-cache
 docker compose build --no-cache backend
 ```
 
-### Frontend Shows Blank Page
+> **Important**: After changing `.env`, use `docker compose up -d --force-recreate backend` (not just `restart`) so the container picks up the new environment variables.
 
-**Symptom**: Frontend loads but API calls fail.
+### Frontend Shows Proxy Errors (ECONNREFUSED)
+
+**Symptom**: Frontend loads but shows "Failed to load questions" or proxy errors.
 
 ```bash
-# Check the Vite proxy config
-cat frontend/vite.config.ts
-# Ensure '/api' proxy target matches the backend URL
-
-# Check if backend is reachable
-curl http://localhost:8000/health
+# The Vite dev server proxies /api requests to the backend.
+# In Docker, the target must be the backend service name, NOT localhost.
+# Check frontend/vite.config.ts — the proxy target should be:
+#   target: 'http://backend:8000'
 ```
 
 ### AI Answers Not Appearing
 
-**Symptom**: Questions stay in "analyzing" status forever.
+**Symptom**: Questions stay in "analyzing" status forever, or AI answers say "encountered an unexpected error."
 
 ```bash
 # Check backend logs for RAG errors
 docker compose logs backend | grep -i "rag\|llm\|error"
 
 # Common causes:
-# 1. LLM API not configured — check LLM_API_BASE and LLM_API_KEY
-# 2. No lab docs in database — run `python -m seed`
-# 3. Embedding model not loaded — first call downloads the model (~80MB)
+# 1. LLM API not configured — check LLM_API_BASE and LLM_API_KEY in .env
+# 2. No lab materials ingested — run `python -m seed.ingest_github <url>` (see Step 5)
+# 3. Embedding model not loaded — first call downloads the model (~80MB), check logs for download progress
+# 4. qwen-code-api not on the same Docker network — run:
+#    docker network connect labassist_default qwen-code-api-qwen-code-api-1
 ```
 
 ### Database Connection Refused
@@ -444,12 +523,26 @@ docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 
 ### Update Lab Materials
 
-```bash
-# Re-seed (only if no data exists)
-docker compose -f docker-compose.prod.yml exec backend python -m seed
+When your course materials change, re-ingest the updated labs:
 
-# Or ingest new labs from GitHub
-docker compose -f docker-compose.prod.yml exec backend python -m seed.ingest_github https://github.com/user/new-lab --lab-number 5
+```bash
+# Ingest the updated lab (will prompt to overwrite if lab number already exists)
+docker compose -f docker-compose.prod.yml exec backend python -m seed.ingest_github \
+    https://github.com/your-org/lab-materials \
+    --lab-number 5
+```
+
+**Tip:** You can update labs without stopping the application — changes take effect immediately for new questions. Existing answers are not affected.
+
+**Updating multiple labs:** If you have a script that lists all your lab repos, you can loop through them:
+
+```bash
+# Example: update all labs from a list
+for lab_num in 1 2 3 4 5; do
+    docker compose -f docker-compose.prod.yml exec backend \
+        python -m seed.ingest_github https://github.com/your-org/lab-${lab_num} \
+        --lab-number ${lab_num}
+done
 ```
 
 ### Update the Qwen Code API Proxy

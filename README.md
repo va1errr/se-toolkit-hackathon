@@ -29,7 +29,7 @@ When the AI isn't confident enough, your question automatically goes to a **TA r
 ## Quick Start
 
 ### Prerequisites
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) v2+ (use `docker compose` with a space, not `docker-compose`)
 - A Qwen Code API proxy running (or any OpenAI-compatible API endpoint)
 
 ### Run Locally
@@ -41,15 +41,22 @@ cd LabAssist
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env and set your LLM_API_BASE and SECRET_KEY
+# Edit .env and set your LLM_API_BASE, LLM_API_KEY, and SECRET_KEY
 
 # 3. Start everything
 docker compose up -d --build
 
-# 4. Seed the database with demo data
+# 4. Run database migrations
+docker compose exec backend alembic upgrade head
+
+# 5. Ingest your lab materials from a GitHub repository
+docker compose exec backend python -m seed.ingest_github \
+    https://github.com/your-org/lab-materials --lab-number 1
+
+# 6. (Optional) Seed demo users
 docker compose exec backend python -m seed
 
-# 5. Open your browser
+# 7. Open your browser
 # Frontend: http://localhost
 # Backend API: http://localhost:8000
 # API docs: http://localhost:8000/docs
@@ -62,7 +69,7 @@ The default admin account after seeding is:
 ## How It Works
 
 1. **Ask a question** — Type your question. LabAssist shows similar questions as you type.
-2. **Get an instant answer** — AI reads your course's lab materials and generates an answer in seconds.
+2. **Get an instant answer** — The AI reads your course's lab materials and generates an answer in seconds (via RAG + Qwen LLM).
 3. **Rate the answer** — If it's helpful, give it a 👍. If not, 👎 and a TA will see it in their review queue.
 4. **TA steps in when needed** — Low-confidence AI answers or 👎-rated answers go to the TA queue for human review.
 

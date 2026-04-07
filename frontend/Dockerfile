@@ -10,4 +10,4 @@ COPY . .
 EXPOSE 5173
 
 # Watch for file changes and enable hot module replacement
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--watch"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
