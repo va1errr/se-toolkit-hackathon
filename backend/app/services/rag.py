@@ -26,48 +26,87 @@ from app.services.embeddings import embed_text
 logger = structlog.get_logger()
 
 # Pipeline constants
-TOP_K_DOCS = 3  # Number of lab docs to retrieve
+SIMILARITY_THRESHOLD = 0.25  # Min cosine similarity for a chunk to be included
+STRONG_MATCH_THRESHOLD = 0.35  # Above this, chunks are likely relevant
+MAX_DOCS = 20                # Upper bound on chunks to retrieve
 LLM_TIMEOUT = 120.0  # seconds
+MAX_CONTEXT_CHARS = 120_000  # Max total context chars (~25K tokens) to avoid upstream 400 errors
+
+
+def extract_lab_numbers(question_text: str) -> list[int]:
+    """Extract all explicit lab numbers from question (e.g., 'lab 4 and 5' → [4, 5])."""
+    return sorted(set(
+        int(m) for m in re.findall(r'\blab\s*#?(\d+)\b', question_text, re.IGNORECASE)
+    ))
 
 
 async def retrieve_context(
     question_embedding: List[float],
     session: AsyncSession,
-    top_k: int = TOP_K_DOCS,
+    top_k: int = MAX_DOCS,
+    question_text: str = "",
+    lab_number_filter: List[int] | None = None,
 ) -> List[dict]:
     """Search lab_docs for the most semantically similar content using pgvector.
 
-    Uses cosine distance (<=>) which is built into pgvector.
-    Returns top_k documents with their similarity scores.
+    If lab_number_filter is provided (extracted from the question), the query
+    prioritizes those specific labs — semantic search runs within the filtered set
+    so that "Lab 1" questions get Lab 1 content, not Lab 5's Git section.
+
+    Returns documents with their similarity scores.
     """
     # Format embedding as a string for pgvector (e.g., "[0.1, 0.2, ...]")
     embedding_str = str(question_embedding)
 
-    query = text("""
-        SELECT id, lab_number, title, content,
+    # Build query — filter by lab_number if explicitly mentioned in question
+    if lab_number_filter:
+        lab_placeholders = ", ".join(f":lab_{i}" for i in range(len(lab_number_filter)))
+        where_clause = f"WHERE lab_number IN ({lab_placeholders})"
+        params = {
+            "embedding": embedding_str,
+            "limit": top_k,
+            **{f"lab_{i}": ln for i, ln in enumerate(lab_number_filter)},
+        }
+        logger.info("Retrieving with lab number filter", labs=lab_number_filter)
+    else:
+        where_clause = ""
+        params = {"embedding": embedding_str, "limit": top_k}
+
+    query = text(f"""
+        SELECT id, lab_number, title, content, chunk_index, num_chunks,
                1 - (embedding <=> CAST(:embedding AS vector)) AS similarity
         FROM lab_doc
+        {where_clause}
         ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :limit
     """)
-
-    result = await session.execute(query, {
-        "embedding": embedding_str,
-        "limit": top_k,
-    })
+    result = await session.execute(query, params)
     rows = result.fetchall()
 
     docs = []
     for row in rows:
-        docs.append({
-            "id": str(row.id),
-            "lab_number": row.lab_number,
-            "title": row.title,
-            "content": row.content,
-            "similarity": float(row.similarity),
-        })
+        sim = float(row.similarity)
+        # When a lab filter was applied, accept all chunks from the filtered labs
+        # (the user explicitly asked about these labs — don't filter by similarity).
+        # When no filter, use the strict threshold to avoid irrelevant context.
+        if lab_number_filter or sim >= STRONG_MATCH_THRESHOLD:
+            docs.append({
+                "id": str(row.id),
+                "lab_number": row.lab_number,
+                "title": row.title,
+                "content": row.content,
+                "similarity": sim,
+                "chunk_index": row.chunk_index,
+                "num_chunks": row.num_chunks,
+            })
 
-    logger.info("Retrieved lab docs", count=len(docs), similarities=[d["similarity"] for d in docs])
+    logger.info(
+        "Retrieved lab doc chunks",
+        count=len(docs),
+        labs_referenced=sorted(set(d["lab_number"] for d in docs)),
+        similarities=[round(d["similarity"], 3) for d in docs],
+        chunk_indices=[d["chunk_index"] for d in docs],
+    )
     return docs
 
 
@@ -79,12 +118,14 @@ def build_prompt(
     """Build the conversation messages for the LLM.
 
     Returns a list of messages (system + user) ready to be sent to the API.
+    Context docs are truncated if they exceed MAX_CONTEXT_CHARS.
     """
     system_prompt = """You are a helpful teaching assistant for a programming lab course.
 Answer student questions based on the provided lab materials when possible.
 
 Rules:
-- If the context contains relevant information, use it to form your answer and cite the lab number.
+- If the context contains relevant information, use it to form your answer and cite the lab number(s).
+- When multiple labs are provided, synthesize across them — explain how concepts evolve from lab to lab.
 - If the context is NOT relevant or doesn't help, answer from your general programming knowledge. Clearly state "This is not covered in the lab materials, but here's what I know:" before your answer.
 - Always end your response with a confidence score between 0.0 and 1.0.
 - Keep answers clear, practical, and example-driven.
@@ -94,14 +135,50 @@ ANSWER: <your detailed answer>
 CONFIDENCE: <0.0 to 1.0>
 """
 
-    # Build context section from retrieved docs
-    context_parts = []
+    # Group chunks by lab_number, preserving similarity order
+    lab_groups: dict[int, list[dict]] = {}
     for doc in context_docs:
-        context_parts.append(
-            f"### Lab {doc['lab_number']}: {doc['title']}\n{doc['content']}"
-        )
+        lab_groups.setdefault(doc["lab_number"], []).append(doc)
 
-    context_section = "\n\n---\n\n".join(context_parts)
+    # Build context section from grouped chunks, respecting size limit
+    chunk_parts = []
+    total_chars = 0
+    separator = "\n\n---\n\n"
+
+    for lab_num in sorted(lab_groups.keys()):
+        lab_chunks = lab_groups[lab_num]
+        lab_title = lab_chunks[0].get("title", f"Lab {lab_num}")
+
+        for chunk in lab_chunks:
+            chunk_label = (
+                f" (part {chunk['chunk_index'] + 1}/{chunk['num_chunks']})"
+                if chunk.get("num_chunks", 1) > 1
+                else ""
+            )
+            header = f"### Lab {lab_num}{chunk_label}: {lab_title}\n"
+            content = chunk['content']
+            doc_chars = len(header) + len(content) + len(separator)
+
+            if total_chars + doc_chars > MAX_CONTEXT_CHARS:
+                remaining = MAX_CONTEXT_CHARS - total_chars
+                if remaining > 500:
+                    truncated_content = content[:remaining - len(header) - 50] + "\n\n...(content truncated due to size limit)"
+                    chunk_parts.append(header + truncated_content)
+                    logger.warning(
+                        "Context truncated due to size limit",
+                        total_chars=total_chars,
+                        lab=lab_num,
+                    )
+                total_chars = MAX_CONTEXT_CHARS  # Signal we're full
+                break
+
+            chunk_parts.append(header + content)
+            total_chars += doc_chars
+
+        if total_chars >= MAX_CONTEXT_CHARS:
+            break
+
+    context_section = separator.join(chunk_parts)
 
     user_prompt = f"""Question: {question_title}
 
@@ -111,7 +188,7 @@ CONFIDENCE: <0.0 to 1.0>
 
 Relevant lab materials:
 
-{context_section}
+{context_section if context_section else "(No relevant lab materials found — answer from your general knowledge.)"}
 """
 
     return [
@@ -208,11 +285,39 @@ async def run_rag_pipeline(
     question_embedding = embed_text(full_question)
 
     # Step 2: Retrieve
-    context_docs = await retrieve_context(question_embedding, session)
+    # Extract explicit lab number mentions from the question text
+    mentioned_labs = extract_lab_numbers(full_question)
 
-    if not context_docs:
-        logger.warning("No relevant lab docs found — answering from general knowledge")
-        context_docs = []  # LLM will answer from general knowledge
+    context_docs = await retrieve_context(
+        question_embedding, session,
+        question_text=full_question,
+        lab_number_filter=mentioned_labs or None,
+    )
+
+    # Step 2b: If no chunks strongly match, discard context so the LLM answers from general knowledge
+    if context_docs:
+        max_sim = max(d["similarity"] for d in context_docs)
+        if max_sim < STRONG_MATCH_THRESHOLD and not mentioned_labs:
+            # Only skip context if no explicit lab was mentioned
+            logger.info(
+                "No strong matches — answering from general knowledge",
+                max_similarity=round(max_sim, 3),
+                chunk_count=len(context_docs),
+            )
+            context_docs = []
+        elif context_docs:
+            logger.info("Matches found — using lab context", max_similarity=round(max_sim, 3))
+        else:
+            logger.info("Lab filter applied but no chunks matched threshold — answering from general knowledge")
+            context_docs = []
+    else:
+        if mentioned_labs:
+            logger.warning(
+                "No matching chunks for explicitly mentioned labs",
+                labs=mentioned_labs,
+            )
+        else:
+            logger.info("No relevant lab docs found — answering from general knowledge")
 
     # Step 3: Build prompt and call LLM (always call it, even with empty context)
     messages = build_prompt(question_title, question_body, context_docs)

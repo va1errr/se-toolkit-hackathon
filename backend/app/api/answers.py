@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col, select, text
+from sqlmodel import select, text
 
 from app.database import get_session
 from app.models.models import Answer, Rating, Question, User

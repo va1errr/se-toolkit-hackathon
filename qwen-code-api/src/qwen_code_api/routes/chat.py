@@ -199,6 +199,13 @@ async def chat_completions(
             status = exc.response.status_code
             last_status = status
 
+            # Log full upstream error response for debugging
+            try:
+                error_body = exc.response.text
+                log.error("Upstream error %d: %s", status, error_body[:500])
+            except Exception:
+                pass
+
             # Check for validation errors first (return 400, don't retry)
             error_message = str(exc)
             if is_validation_error(error_message):
@@ -265,6 +272,30 @@ async def chat_completions(
                             code="invalid_token",
                         ),
                     )
+
+            # Pass through 400 Bad Request errors from upstream
+            if status == 400:
+                log.warning("Upstream 400 error: %s", error_message[:200])
+                if settings.log_requests:
+                    live_logger.proxy_error(
+                        request_id=request_id,
+                        status_code=400,
+                        account_id=None,
+                        error_message=error_message[:200],
+                    )
+                try:
+                    error_body = exc.response.json()
+                    return JSONResponse(status_code=400, content=error_body)
+                except Exception:
+                    return JSONResponse(
+                        status_code=400,
+                        content=make_error_response(
+                            error_message,
+                            error_type="upstream_error",
+                            code="bad_request",
+                        ),
+                    )
+
             break
 
         except Exception as exc:
@@ -354,15 +385,16 @@ async def chat_completions(
             ),
         )
 
-    # Default: generic API error
+    # Default: use the actual upstream status code, or 500 if unknown
+    final_status = last_status or 500
     if settings.log_requests:
         live_logger.proxy_error(
             request_id=request_id,
-            status_code=500,
+            status_code=final_status,
             account_id=None,
             error_message=error_msg,
         )
     return JSONResponse(
-        status_code=500,
+        status_code=final_status,
         content=make_error_response(error_msg, error_type="api_error"),
     )

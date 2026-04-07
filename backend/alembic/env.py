@@ -23,6 +23,10 @@ from app.models.models import User, Question, Answer, Rating, LabDoc  # noqa: F4
 
 config = context.config
 
+# Override the database URL from app settings (handles Docker networking)
+from app.config import settings
+config.set_main_option("sqlalchemy.url", settings.sync_database_url)
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

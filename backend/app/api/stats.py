@@ -65,8 +65,8 @@ async def get_stats(
     ta_result = await session.execute(text("SELECT COUNT(*) FROM \"user\" WHERE role IN ('ta', 'admin')"))
     total_tas = ta_result.scalar() or 0
 
-    # Lab docs count
-    labs_result = await session.execute(text("SELECT COUNT(*) FROM lab_doc"))
+    # Lab docs count — count distinct lab numbers, not chunks
+    labs_result = await session.execute(text("SELECT COUNT(DISTINCT lab_number) FROM lab_doc"))
     total_labs = labs_result.scalar() or 0
 
     # Top 5 most active users (by questions posted)

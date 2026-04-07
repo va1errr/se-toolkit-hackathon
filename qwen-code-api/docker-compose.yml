@@ -9,7 +9,7 @@ services:
       - "${HOST_ADDRESS:-127.0.0.1}:${HOST_PORT:-8080}:${PORT:-8080}"
 
     volumes:
-      - ~/.qwen:/mnt/qwen-creds:ro
+      - /root/.qwen:/mnt/qwen-creds:ro
 
     environment:
       - PORT=${PORT:-8080}

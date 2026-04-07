@@ -7,7 +7,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col, select
+from sqlmodel import select
 
 from app.database import get_session
 from app.models.models import User
