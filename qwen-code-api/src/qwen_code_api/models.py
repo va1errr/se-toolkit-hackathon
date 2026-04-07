@@ -11,9 +11,27 @@ MODEL_ALIASES: dict[str, str] = {
 
 
 def is_auth_error(status: int | None, message: str) -> bool:
-    """Check if error is authentication-related (400/401/403/504 or auth message)."""
-    if status in (400, 401, 403, 504):
+    """Check if error is authentication-related (401/403 or auth message).
+
+    Note: 400 is NOT automatically treated as auth error, since it usually
+    indicates a bad request (invalid payload, too long, etc.). We only treat
+    it as auth error if the message contains auth-related keywords.
+    """
+    if status in (401, 403):
         return True
+    if status == 400:
+        # Only treat 400 as auth error if the message suggests it
+        msg_lower = message.lower()
+        auth_keywords = [
+            "unauthorized",
+            "forbidden",
+            "token expired",
+            "invalid api key",
+            "invalid access token",
+            "authentication",
+            "access denied",
+        ]
+        return any(kw in msg_lower for kw in auth_keywords)
     msg_lower = message.lower()
     return any(
         x in msg_lower

@@ -27,6 +27,7 @@ from sqlmodel import Session, create_engine, select
 from app.config import settings
 from app.models.models import LabDoc
 from app.services.embeddings import EmbeddingService
+from app.services.chunker import chunk_lab_content
 
 
 def clone_and_ingest(repo_url: str, lab_number: int | None = None, lab_title: str | None = None):
@@ -99,34 +100,44 @@ def clone_and_ingest(repo_url: str, lab_number: int | None = None, lab_title: st
         for f in relevant_files:
             print(f"   - {f.relative_to(repo_path)}")
 
+        # Chunk the combined content
+        chunks = chunk_lab_content(combined_content, title=final_title)
+        print(f"   📦 Split into {len(chunks)} chunks (sizes: {[len(c) for c in chunks]})")
+
         with Session(engine) as session:
-            # Check for duplicate by title
-            existing = session.exec(select(LabDoc).where(LabDoc.lab_number == lab_number)).first()
+            # Check for duplicate by lab_number and remove old chunks
+            existing = session.exec(select(LabDoc).where(LabDoc.lab_number == lab_number)).all()
             if existing:
-                print(f"\n⚠️  Lab {lab_number} already exists: {existing.title}")
+                print(f"\n⚠️  Lab {lab_number} already exists ({len(existing)} chunk(s)): {existing[0].title}")
                 overwrite = input("Overwrite? (y/N): ").strip().lower()
                 if overwrite != "y":
                     print("⏭️  Skipping.")
                     return
-                session.delete(existing)
+                for old_doc in existing:
+                    session.delete(old_doc)
                 session.flush()
 
-            print(f"\n✨ Generating embedding for '{final_title}'...")
+            print(f"\n✨ Generating embeddings for {len(chunks)} chunk(s)...")
 
-            embedding = svc.embed(combined_content)
+            embeddings = svc.embed_many(chunks)
 
-            doc = LabDoc(
-                lab_number=lab_number,
-                title=final_title,
-                content=combined_content,
-                embedding=embedding,
-            )
-            session.add(doc)
+            for chunk_idx, (chunk_content, embedding) in enumerate(zip(chunks, embeddings)):
+                doc = LabDoc(
+                    lab_number=lab_number,
+                    title=final_title,
+                    content=chunk_content,
+                    embedding=embedding,
+                    chunk_index=chunk_idx,
+                    num_chunks=len(chunks),
+                )
+                session.add(doc)
+
             session.commit()
 
             print(f"✅ Successfully ingested!")
             print(f"   Title: {final_title}")
             print(f"   Content size: {len(combined_content):,} chars")
+            print(f"   Chunks created: {len(chunks)}")
             print(f"   Files included: {len(relevant_files)}")
 
 

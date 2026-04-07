@@ -21,6 +21,7 @@ from sqlmodel import SQLModel, Session, create_engine, select
 from app.config import settings
 from app.models.models import User, LabDoc
 from app.services.auth import hash_password
+from app.services.chunker import chunk_lab_content
 
 
 def seed_db():
@@ -74,19 +75,31 @@ def seed_db():
             except ValueError:
                 lab_number = len(lab_docs) + 1
 
-            doc = LabDoc(
-                lab_number=lab_number,
-                title=title,
-                content=content,
-            )
-            lab_docs.append(doc)
+            # Chunk the content and create a LabDoc for each chunk
+            chunks = chunk_lab_content(content, title=title)
+            for chunk_idx, chunk_content in enumerate(chunks):
+                doc = LabDoc(
+                    lab_number=lab_number,
+                    title=title,
+                    content=chunk_content,
+                    chunk_index=chunk_idx,
+                    num_chunks=len(chunks),
+                )
+                lab_docs.append(doc)
 
         session.add_all(lab_docs)
         session.commit()
 
-        print(f"  Created {len(lab_docs)} lab documents:")
+        print(f"  Created {len(lab_docs)} lab document chunk(s):")
+        # Group by lab_number for display
+        grouped = {}
         for doc in lab_docs:
-            print(f"    - Lab {doc.lab_number}: {doc.title}")
+            grouped.setdefault(doc.lab_number, []).append(doc)
+        for lab_num, docs in sorted(grouped.items()):
+            if len(docs) == 1:
+                print(f"    - Lab {lab_num}: {docs[0].title} (1 chunk)")
+            else:
+                print(f"    - Lab {lab_num}: {docs[0].title} ({len(docs)} chunks)")
 
         print("Seeding complete!")
 

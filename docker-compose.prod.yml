@@ -23,7 +23,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile.prod
     container_name: labassist-backend
-    env_file: .env
+    env_file: .env.prod
     expose:
       - "8000"
     volumes:

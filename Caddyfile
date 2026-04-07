@@ -1,9 +1,0 @@
-:80 {
-    encode gzip
-
-    # Proxy API requests to backend
-    reverse_proxy /api/* backend:8000
-
-    # Proxy everything else to frontend
-    reverse_proxy frontend:80
-}

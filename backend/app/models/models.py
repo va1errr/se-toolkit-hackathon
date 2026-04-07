@@ -101,7 +101,11 @@ class Rating(SQLModel, table=True):
 
 
 class LabDoc(SQLModel, table=True):
-    """A lab document used by the RAG pipeline for context retrieval."""
+    """A chunk of a lab document used by the RAG pipeline for context retrieval.
+
+    Large lab materials are split into multiple chunks (by section/file boundary).
+    Each chunk has its own embedding so semantic search retrieves only relevant sections.
+    """
 
     __tablename__ = "lab_doc"
 
@@ -113,4 +117,6 @@ class LabDoc(SQLModel, table=True):
         default=None,
         sa_column=Column(Vector(384)),  # 384-dim from all-MiniLM-L6-v2
     )
+    chunk_index: int = Field(default=0)  # 0-based position within the original doc
+    num_chunks: int = Field(default=1)   # total chunks this lab was split into
     updated_at: datetime = Field(default_factory=datetime.utcnow)
