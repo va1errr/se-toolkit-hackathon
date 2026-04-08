@@ -11,24 +11,36 @@ When the AI isn't confident enough, your question automatically goes to a **TA r
 ## Key Features
 
 ### For Students
+
 - **Instant AI answers** — Post a question and get a response in seconds, based on your lab materials
 - **Duplicate detection** — As you type, LabAssist suggests similar existing questions so you don't repeat yourself
 - **Rate answers** — Thumbs up or down to help the system improve and let other students know which answers are reliable
 - **Markdown support** — Answers are formatted with code blocks, lists, and headings for readability
 
 ### For TAs
+
 - **Review queue** — See AI answers that students rated as unhelpful or that the AI flagged as low-confidence
 - **Correct answers** — Add your own answer to any question, which overrides the AI response
 - **Edit and manage** — Edit or delete your own answers, or any non-AI answer if you're an admin
 - **Stats dashboard** — Monitor forum health: how many questions are being asked, how well the AI performs, which users are most active
 
 ### For Admins
+
 - **Manage content** — Hide inappropriate or off-topic questions from the TA queue
 - **Full control** — Edit or delete any non-AI answer, manage user roles
+
+### Demo
+<img width="1508" height="783" alt="Screenshot 2026-04-08 at 12 35 29" src="https://github.com/user-attachments/assets/b50523b9-f642-41de-971d-82ce7b6505f9" />
+<img width="1512" height="787" alt="Screenshot 2026-04-08 at 12 35 54" src="https://github.com/user-attachments/assets/0ac2cf76-c676-470b-a89c-ee99c746e065" />
+<img width="1512" height="778" alt="Screenshot 2026-04-08 at 12 48 26" src="https://github.com/user-attachments/assets/2587aafa-5734-4d05-b91b-a50cdec23a36" />
+<img width="1512" height="783" alt="Screenshot 2026-04-08 at 12 48 40" src="https://github.com/user-attachments/assets/24633cb9-4123-4cef-b63d-584e049c2cea" />
+<img width="1512" height="781" alt="Screenshot 2026-04-08 at 12 49 22" src="https://github.com/user-attachments/assets/9bb38d21-3c09-462b-9be8-abff61ec8176" />
+
 
 ## Quick Start
 
 ### Prerequisites
+
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) v2+ (use `docker compose` with a space, not `docker-compose`)
 - A Qwen Code API proxy running (or any OpenAI-compatible API endpoint)
 
@@ -37,7 +49,7 @@ When the AI isn't confident enough, your question automatically goes to a **TA r
 ```bash
 # 1. Clone the repository
 git clone <your-repo-url>
-cd LabAssist
+cd se-toolkit-hackathon
 
 # 2. Configure environment
 cp .env.example .env
@@ -63,6 +75,7 @@ docker compose exec backend python -m seed
 ```
 
 The default admin account after seeding is:
+
 - **Username**: `admin`
 - **Password**: `admin123`
 
@@ -76,7 +89,7 @@ The default admin account after seeding is:
 ## Tech Stack (Overview)
 
 | Layer | Technology |
-|-------|------------|
+| ------- | ------------ |
 | Frontend | React + TypeScript + Vite |
 | Backend | FastAPI (Python) |
 | Database | PostgreSQL with vector search (pgvector) |
@@ -87,7 +100,7 @@ See [`WIKI.md`](./WIKI.md) for complete technical details.
 
 ## Project Structure
 
-```
+```bash
 LabAssist/
 ├── backend/              # FastAPI Python backend
 ├── frontend/             # React TypeScript frontend
@@ -100,19 +113,15 @@ LabAssist/
 └── WIKI.md               # Complete technical documentation
 ```
 
-## Production Deployment
+## Deployment
 
-See [`DEPLOY.md`](./DEPLOY.md) for step-by-step production deployment instructions.
+See [`DEPLOY.md`](./DEPLOY.md) for step-by-step deployment instructions.
 
 ## Documentation
 
 | File | Purpose |
-|------|---------|
+| ------ | --------- |
 | [`README.md`](./README.md) | This file — overview and quick start |
 | [`DEPLOY.md`](./DEPLOY.md) | Step-by-step deployment guide |
 | [`WIKI.md`](./WIKI.md) | Complete technical documentation (architecture, API, AI/RAG, database, debugging, etc.) |
 | [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) | Feature list and implementation status |
-
-## License
-
-This project is provided as-is for educational and internal use.
