@@ -1,20 +1,18 @@
 # Deployment Guide
 
-This guide covers deploying LabAssist in both **development** and **production** environments.
+This guide covers deploying LabAssist.
 
 ---
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Development Deployment](#development-deployment)
-3. [Production Deployment](#production-deployment)
-4. [Database Seeding](#database-seeding)
-5. [Environment Variables](#environment-variables)
-6. [Managing the Application](#managing-the-application)
-7. [Troubleshooting](#troubleshooting)
-8. [Backup & Restore](#backup--restore)
-9. [Updating the Application](#updating-the-application)
+2. [Deployment](#deployment)
+3. [Managing LLM API](#managing-the-llm-api)
+4. [Managing the Application](#managing-the-application)
+5. [Troubleshooting](#troubleshooting)
+6. [Backup & Restore](#backup--restore)
+7. [Updating the Application](#updating-the-application)
 
 ---
 
@@ -27,92 +25,7 @@ Before deploying LabAssist, ensure the following are installed and configured:
 - **Git** — for cloning the repository
 - **An LLM API endpoint** compatible with OpenAI's `/chat/completions` format — see below
 
-### Step 0: Start the LLM API
-
-LabAssist needs an LLM to generate answers. You have two options:
-
-#### Option 1: Use the included qwen-code-api proxy (Qwen Code via OAuth)
-
-> **Important order:** The `docker network connect` command must be run **after** both the LabAssist stack and qwen-code-api are running, because the `labassist_default` network is only created when LabAssist starts.
-
-**Phase 1 — Start qwen-code-api:**
-
-```bash
-cd qwen-code-api
-cp .env.example .env
-# Edit .env — set your Qwen OAuth credentials
-docker compose up -d --build
-```
-
-**Phase 2 — Start LabAssist (creates the Docker network):**
-
-```bash
-cd /root/se-toolkit-hackathon   # your project root
-cp .env.example .env
-# Edit .env — set LLM_API_BASE, LLM_API_KEY, SECRET_KEY, etc.
-docker compose up -d --build
-```
-
-**Phase 3 — Connect the two networks:**
-
-```bash
-# Now that both projects are running, connect them to the same network
-docker network connect labassist_default qwen-code-api-qwen-code-api-1
-```
-
-**Verify everything works:**
-
-```bash
-# Check qwen-code-api is healthy
-docker exec labassist-backend python -c "
-import urllib.request
-r = urllib.request.urlopen('http://qwen-code-api-qwen-code-api-1:8080/health')
-print('qwen-code-api reachable, status:', r.status)
-"
-```
-
-The proxy runs on port 8080. Set `LLM_API_BASE=http://qwen-code-api-qwen-code-api-1:8080/v1` in your LabAssist `.env` (using the container name, since `host.docker.internal` does not resolve on Linux).
-
-> **Note:** qwen-code-api is a **separate Docker Compose project**. It does NOT start automatically with LabAssist — you must start it yourself first.
-
-#### Option 2: Use any OpenAI-compatible API
-
-If you have Ollama, DashScope, vLLM, or another compatible server, just point `LLM_API_BASE` to it:
-
-```env
-# Examples:
-LLM_API_BASE=http://host.docker.internal:11434/v1          # Ollama
-LLM_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1  # DashScope
-```
-
----
-
-## Managing the LLM API
-
-### If using qwen-code-api
-
-| Action | Command |
-|--------|---------|
-| **Start** | `cd qwen-code-api && docker compose up -d --build` |
-| **Stop** | `cd qwen-code-api && docker compose down` |
-| **Restart** | `cd qwen-code-api && docker compose restart` |
-| **View logs** | `cd qwen-code-api && docker compose logs -f` |
-| **Check health** | `curl http://localhost:8080/health` |
-
-### Token expiry
-
-Qwen OAuth tokens expire. Check and refresh them with:
-
-```bash
-bash scripts/check-qwen-oauth-expiry.sh    # Check expiry
-bash scripts/refresh-qwen-oauth.sh         # Re-authenticate (may need browser)
-```
-
-For full details on qwen-code-api, see [`WIKI.md`](./WIKI.md#27-what-is-qwen-code-api).
-
----
-
-## Development Deployment
+## Deployment
 
 For local development with hot-reload on both frontend and backend.
 
@@ -120,7 +33,7 @@ For local development with hot-reload on both frontend and backend.
 
 ```bash
 git clone <your-repo-url>
-cd LabAssist
+cd se-toolkit-hackathon
 ```
 
 ### Step 2: Configure Environment Variables
@@ -160,7 +73,8 @@ docker compose up -d --build
 ```
 
 This starts three services:
-- **PostgreSQL** (with pgvector extension) — port `5433` on host
+
+- **PostgreSQL** (with pgvector extension) — port `5432` on host
 - **Backend** (FastAPI with hot-reload) — port `8000` on host
 - **Frontend** (React/Vite with hot-reload) — port `80` on host (proxied from container's `5173`)
 
@@ -174,7 +88,7 @@ docker compose ps
 curl http://localhost:8000/health
 
 # Open the frontend
-# http://localhost
+# http://<vm-ip>
 ```
 
 ### Step 4b: Run Database Migrations
@@ -198,6 +112,7 @@ docker compose exec backend python -m seed.ingest_github \
 ```
 
 **How it works:**
+
 1. Clones the repository (shallow clone, fast)
 2. Finds all `.md` files, skipping boilerplate (LICENSE, CHANGELOG, etc.)
 3. Concatenates them into a single lab document
@@ -208,7 +123,7 @@ docker compose exec backend python -m seed.ingest_github \
 **Options:**
 
 | Flag | Required | Description |
-|------|----------|-------------|
+| ------ | ---------- | ------------- |
 | `repo_url` | ✅ | GitHub repository URL (must be public or accessible with git credentials) |
 | `--lab-number` | Auto-detected | Lab number. Auto-detected from repo name if omitted (e.g., `lab-3` → 3) |
 | `--lab-title` | Auto-detected | Lab title. Auto-detected from the first `#` heading if omitted |
@@ -234,6 +149,7 @@ docker compose exec backend python -m seed.ingest_github https://github.com/univ
 **Overwriting existing labs:** If a lab with the same number already exists, the script will prompt you to confirm overwriting. Use this to update lab materials when content changes.
 
 **Requirements:**
+
 - The repository must be accessible (public, or you have git credentials configured)
 - Markdown files must have at least 50 characters of content to be included
 - First run downloads the embedding model (~80MB), which is cached for future use
@@ -247,122 +163,78 @@ docker compose exec backend python -m seed
 ```
 
 This creates:
-- An admin user (`admin` / `admin123`)
 
-> **Note:** The seed script no longer creates lab documents from the `seed/` directory. Use `ingest_github` (Step 5) to load your actual course materials instead.
+- An admin user (`admin` / `admin123`)
+- Demo lab documents from `seed` directory
 
 ---
 
-## Production Deployment
+### Step 6: Start the LLM API
 
-For production, the stack uses optimized multi-stage builds, and Nginx in the frontend container handles both static file serving and reverse proxying `/api/*` to the backend.
+LabAssist needs an LLM to generate answers. You have two options:
 
-### Step 1: Prepare the Server
-
-Ensure your production server has:
-- Docker and Docker Compose installed
-- Ports 80 (and 443 if using external HTTPS) open
-
-### Step 2: Clone and Configure
+#### Option 1: Use the included qwen-code-api proxy (Qwen Code via OAuth)
 
 ```bash
-git clone <your-repo-url> /opt/LabAssist
-cd /opt/LabAssist
-cp .env.prod.example .env.prod
+cd /root/se-toolkit-hackathon/qwen-code-api
+cp .env.example .env
+# Edit .env — set your Qwen OAuth credentials
+docker compose up -d --build
+
+# Verify it's running
+curl http://localhost:8080/health
+
+# Connect qwen-code-api to LabAssist's Docker network so the backend can reach it
+docker network connect labassist_default qwen-code-api-qwen-code-api-1
 ```
 
-Edit `.env.prod`:
+The proxy runs on port 8080. Set `LLM_API_BASE=http://qwen-code-api-qwen-code-api-1:8080/v1` in your LabAssist `.env` (using the container name, since `host.docker.internal` does not resolve on Linux).
+
+> **Note:** qwen-code-api is a **separate Docker Compose project**. It does NOT start automatically with LabAssist — you must start it yourself first.
+
+#### Option 2: Use any OpenAI-compatible API
+
+If you have Ollama, DashScope, vLLM, or another compatible server, just point `LLM_API_BASE` to it:
 
 ```env
-# Database
-DATABASE_URL=postgresql+asyncpg://postgres:your-secure-password@postgres:5432/labassist
-
-# LLM API
-LLM_API_BASE=http://qwen-code-api:8080/v1
-LLM_API_KEY=your-qwen-api-key
-
-# Security — MUST be a strong random key
-SECRET_KEY=$(openssl rand -hex 32)
-
-# CORS — your production domain or IP
-CORS_ORIGINS=http://your-server-ip
-
-# App environment
-APP_ENV=production
-LOG_LEVEL=WARNING
-```
-
-### Step 3: Start the Production Stack
-
-```bash
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-**How it works:** The frontend container runs Nginx, which:
-1. Serves the built React static files
-2. Reverse proxies `/api/*` requests to the backend container
-3. Handles SPA routing (`try_files` fallback to `index.html`)
-4. Adds security headers (`X-Frame-Options`, `X-Content-Type-Options`, etc.)
-
-No separate reverse proxy (like Caddy) is needed.
-
-### Step 4: Ingest Lab Materials
-
-```bash
-docker compose -f docker-compose.prod.yml exec backend python -m seed.ingest_github \
-    https://github.com/your-org/lab-materials \
-    --lab-number 1 \
-    --lab-title "Introduction to Lab"
-```
-
-> See the [Ingest Lab Materials from GitHub](#step-5-ingest-lab-materials-from-github) section above for full details and options.
-
-### Step 5: Seed Demo Users (Optional)
-
-```bash
-docker compose -f docker-compose.prod.yml exec backend python -m seed
-```
-
-### Step 6: Verify
-
-```bash
-# Check services
-docker compose -f docker-compose.prod.yml ps
-
-# Health check
-curl http://localhost/health
-
-# Visit your domain in a browser
+# Examples:
+LLM_API_BASE=http://host.docker.internal:11434/v1          # Ollama
+LLM_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1  # DashScope
 ```
 
 ---
 
-## Environment Variables
+## Managing the LLM API
 
-### Development (`.env`)
+### If using qwen-code-api
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `postgresql+asyncpg://postgres:postgres@postgres:5432/labassist` | Async PostgreSQL connection (use `postgres` service name in Docker) |
-| `LLM_API_BASE` | `http://qwen-code-api-qwen-code-api-1:8080/v1` | Base URL for the LLM API (when using qwen-code-api on the same Docker network) |
-| `LLM_API_KEY` | *(empty)* | API key for LLM authentication |
-| `SECRET_KEY` | `change-me-to-a-random-string` | JWT signing key — **change in production** |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | JWT token lifetime |
-| `CORS_ORIGINS` | `http://localhost` | Comma-separated allowed origins |
-| `APP_ENV` | `development` | `development` or `production` |
-| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| Action | Command |
+| -------- | --------- |
+| **Start** | `cd qwen-code-api && docker compose up -d --build` |
+| **Stop** | `cd qwen-code-api && docker compose down` |
+| **Restart** | `cd qwen-code-api && docker compose restart` |
+| **View logs** | `cd qwen-code-api && docker compose logs -f` |
+| **Check health** | `curl http://localhost:8080/health` |
 
-> **Note**: Requires Docker Compose v2 (`docker compose` with a space, not `docker-compose`).
+### Token expiry
 
-### Production (`.env.prod`)
+Qwen OAuth tokens expire. Check and refresh them with:
 
-Same variables, but:
-- Use a **strong random** `SECRET_KEY`
-- Set `CORS_ORIGINS` to your **production domain**
-- Set `APP_ENV=production`
-- Set `LOG_LEVEL=WARNING` (or `ERROR`)
+On local machine:
 
----
+```bash
+qwen auth qwen-oauth 
+scp ~/.qwen/oauth_creds.json <your vm>:~/.qwen/oauth_creds.json
+```
+
+On the VM:
+
+```bash
+bash scripts/check-qwen-oauth-expiry.sh    # Check expiry
+bash scripts/refresh-qwen-oauth.sh         # Re-authenticate (may need browser)
+```
+
+For full details on qwen-code-api, see [`WIKI.md`](./WIKI.md#27-what-is-qwen-code-api).
 
 ## Managing the Application
 
@@ -485,11 +357,8 @@ docker compose port postgres 5432
 Ensure `CORS_ORIGINS` in your `.env` includes the exact origin (protocol + host + port) of your frontend.
 
 ```env
-# Example for dev
+# Example
 CORS_ORIGINS=http://localhost
-
-# Example for prod
-CORS_ORIGINS=https://your-domain.com
 ```
 
 ---
@@ -540,10 +409,10 @@ git pull
 ### Rebuild and Restart
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose up -d --build
 
 # Run any new migrations
-docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose exec backend alembic upgrade head
 ```
 
 ### Update Lab Materials
@@ -552,7 +421,7 @@ When your course materials change, re-ingest the updated labs:
 
 ```bash
 # Ingest the updated lab (will prompt to overwrite if lab number already exists)
-docker compose -f docker-compose.prod.yml exec backend python -m seed.ingest_github \
+docker compose exec backend python -m seed.ingest_github \
     https://github.com/your-org/lab-materials \
     --lab-number 5
 ```
@@ -564,7 +433,7 @@ docker compose -f docker-compose.prod.yml exec backend python -m seed.ingest_git
 ```bash
 # Example: update all labs from a list
 for lab_num in 1 2 3 4 5; do
-    docker compose -f docker-compose.prod.yml exec backend \
+    docker compose exec backend \
         python -m seed.ingest_github https://github.com/your-org/lab-${lab_num} \
         --lab-number ${lab_num}
 done
@@ -576,16 +445,17 @@ done
 cd qwen-code-api
 git pull
 docker compose up -d --build
+docker network connect labassist_default qwen-code-api-qwen-code-api-1
 ```
 
 ---
 
 ## Health Checks
 
-All production services have automatic health checks:
+All services have automatic health checks:
 
 | Service | Check | Interval |
-|---------|-------|----------|
+| --------- | ------- | ---------- |
 | PostgreSQL | `pg_isready` | Every 10s |
 | Backend | `curl http://localhost:8000/health` | Every 30s |
 | Frontend | `wget http://localhost:80` | Every 30s |
@@ -593,7 +463,7 @@ All production services have automatic health checks:
 Check health status:
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
+docker compose ps
 ```
 
 A service showing `(healthy)` is running correctly. `(unhealthy)` means it's running but failing its health check — check logs for details.
